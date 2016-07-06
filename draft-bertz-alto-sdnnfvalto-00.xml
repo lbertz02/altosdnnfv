@@ -596,16 +596,14 @@
     state between ALTO Client and Server.
 </t>
 <figure title="ALTO Aggregation" anchor="altoagg">
-  <artwork>TODO</artwork>
-<!-- <artwork src="image008.png"/> -->
+  <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image008.png"/>
 </figure>
 <t>
     <xref target="altonfvsdn"/> shows the proposed Aggregation overlay with
     SDN and NFV.
 </t>
 <figure title="ALTO, SDN and NFV" anchor="altonfvsdn">
-    <artwork>TODO</artwork>
-<!-- <artwork src="image010.png"/> -->
+    <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image010.png"/>
 </figure>
 <t>
     Services Group 1 ALTO Servers delegate their Map, Cost and EPCS
@@ -790,8 +788,7 @@
     shows the overall process.
 </t>
 <figure title="Parallel VNF FG subgraph and VIM candidate Evaluation" anchor="paralleleval">
-  <artwork>TODO</artwork>
-<!-- <artwork src="image012.png"/> -->
+  <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image012.png"/>
 </figure>
 <t>
     Each row of the subgraph matrix is a VREQsi for the specified
@@ -805,8 +802,7 @@
     Candidate Suitability Matrix results in m valid candidates.
 </t>
 <figure title="VIM Candidate Suitability Matrix Weighting" anchor="vimweighting">
-  <artwork>TODO</artwork>
-<!-- <artwork src="image014.png"/> -->
+  <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image014.png"/>
 </figure>
 <t>
     The Orchestrator must then reconstruct candidates that create a
