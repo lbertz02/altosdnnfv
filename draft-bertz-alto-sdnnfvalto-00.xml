@@ -16,7 +16,7 @@
 
 <rfc category="info" docName="draft-bertz-alto-sdnnfvalto-00" ipr="trust200902">
  <front>
-   <title>Programmaabl NFV/SDN orchestration with ALTO</title>
+   <title>Programmable NFV/SDN orchestration with ALTO</title>
 
    <author fullname="Lyle Bertz" initials="L." surname="Bertz">
      <organization>Sprint</organization>
