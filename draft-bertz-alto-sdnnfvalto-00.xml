@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="US-ASCII"?>
 <!DOCTYPE rfc SYSTEM "rfc2629.dtd" [
 <!ENTITY RFC2119 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.2119.xml">
-<!ENTITY RFC7286 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.7286.xml">
+<!ENTITY RFC7285 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.7285.xml">
 <!ENTITY IDALAGG SYSTEM "http://xml.resource.org/public/rfc/bibxml3/reference.I-D.bertz-alto-aggrimpl.xml">
+<!ENTITY ALTOSSE SYSTEM "http://xml.resource.org/public/rfc/bibxml3/reference.I-D.roome-alto-incr-update-sse.xml">
 ]>
 <?xml-stylesheet type='text/xsl' href='rfc2629.xslt' ?>
 <?rfc strict="yes" ?>
@@ -592,24 +593,84 @@
 <t>
     Aggregation of partial ALTO information is possible but not
     standard.  <xref target="altoagg"/> shows the proposed system uses ALTO Client
-    standards and ALTO Server Side Events to maintain synchronized
+    standards and ALTO Server Side Events (SSE) <xref target="I-D.roome-alto-incr-update-sse"/> to maintain synchronized
     state between ALTO Client and Server.
 </t>
 <figure title="ALTO Aggregation" anchor="altoagg">
-  <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image008.png"/>
-</figure>
+<artwork><![CDATA[
+                +----------------+
+                |  ALTO Client   |
+                +----------------+
+                        |
+                        | ALTO
+                        |
+               +--------+---------+
+               | ALTO Query Tier  |
+               +------------------+
+                        ^
+                        | ALTO SSE
+                        |
+               +--------+---------+
+               | ALTO Aggregation |
+               |      Tier        |
+               +--------+---------+
+                        ^
+                        | ALTO SSE
+                        |
+                  +-----+-----+
+                  |    ALTO   |
+                  |  Servers  |
+                  +-----+-----+
+]]></artwork></figure>
 <t>
     <xref target="altonfvsdn"/> shows the proposed Aggregation overlay with
     SDN and NFV.
 </t>
-<figure title="ALTO, SDN and NFV" anchor="altonfvsdn">
-    <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image010.png"/>
-</figure>
 <t>
-    Services Group 1 ALTO Servers delegate their Map, Cost and EPCS
-    services to the ALTO aggregators.  This allows other ALTO Clients
-    to query and Element Manager or NFVO function and be directed to
-    the consolidated view provided by the ALTO Aggregator.
+</t>
+<figure title="ALTO, SDN and NFV" anchor="altonfvsdn">
+<artwork><![CDATA[
+ +-----------+
+ |   ALTO    |<----------------------------------------+
+ |  Server   |<--------------------------+             |
+ +---+-------+                           | (B)         |
+     |     ^                             |             |
+     |     |      +-----------+          |             | (A)
+     |     +------+   E/NMS   |   +------+-----+       |
+     |       (C)  +-----------+   |Orchestrator+-+     |
+     |                  |         +------+-----+ |     |
+     |                  |                        |     |
+     |            +-----+-----+   +------+-----+ |     |
+     +----------->|    VNF    |---+    VNFM    | |     |
+         (D)      +-----------+   |            | | +---+--------+
+                        |         |            |-+-|    SDN     |
+                        |         +------+-----+ | | Controller |
+                        |                |       | +---+--------+
+                  +-----+-----+   +------+-----+ |     |
+                  |   NFVI    |---|     VIM    |-+     |
+                  +-----+-----+   +------------+       |
+                        |                              |
+                  +-----+-----+                        |
+                  |    SDN    |------------------------+
+                  |   Switch  |
+                  +-----+-----+
+]]></artwork></figure>
+<t>
+    Links A, B and C use ALTO SSE <xref target="I-D.roome-alto-incr-update-sse"/> to
+    update an ALTO Server.   Link D, if present, uses the ALTO
+    protocol <xref target="RFC7285"/>.
+</t>
+<t>
+    Links B and C ALTO Servers delegate their Map, Cost and EPCS
+    services to the ALTO aggregators.  Delegation is pushed to IRDs
+    of the Query Tier (see <xref target="altoagg"/>).  This allows
+    other ALTO Clients to query and Element Manager or NFVO function
+    and be directed to the consolidated view provided by the ALTO
+    Aggregator.
+</t>
+<t>
+    The SDN Controller used Link A to provide the Map Service, Cost
+    Service, Endpoint Costs and Property Services as required.
 </t>
   </section>
   <section title="Feature 3 Support">
@@ -770,7 +831,7 @@
 <section title="" anchor="selforganization">
 <t>
     ALTO provides the ability for Clients to look up ALTO Servers
-    <xref target="RFC7286"/>.  This can be enhanced to support Aggregator Discovery or an
+    <xref target="RFC7285"/>.  This can be enhanced to support Aggregator Discovery or an
     alternative method can be constructed. ALTO information origins,
     which are ALTO servers, can be discovered by Aggregators acting
     as Clients.  The mechanism by which Aggregators divide work can be
@@ -788,8 +849,28 @@
     shows the overall process.
 </t>
 <figure title="Parallel VNF FG subgraph and VIM candidate Evaluation" anchor="paralleleval">
-  <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image012.png"/>
-</figure>
+<artwork><![CDATA[
+         VNF Subgraph      VIM Candidate   VIM Candidate
+            Matrix            Matrix     Suitability Matrix
+         +--  |   --+      +--  |   --+   +--         --+
+      S1 |    |     |   C1 |    |     |   |    Any      |
+      S2 |    |     |   C2 |    |     |   |  row w/o    |
+      .  |  A |  B  | - .  |  C |  D  | = |  negative   |
+      .  |    |     |   .  |    |     |   |   values    |
+      .  |    |     |   .  |    |     |   | is as valid |
+      Sn |    |     |   Cn |    |     |   |  candidate  |
+      ^  +--  |   --+   ^  +--  |   --+   +--         --+
+      |                 |
+Each Row is a        Each row is a candidate partial solution,
+VNF FG subgraph      i.e. subgraph of a specific VIM intended
+                     to support the corresponding VNF FG subgraph
+]]></artwork>
+<postamble>
+  A - Resources Consumed, B - Subgraph and Adjacent Subgraph Constraints,
+  C - Resources from the VIM and D - Performance Constraints from the
+  VIM via ALTO.]
+</postamble>
+  </figure>
 <t>
     Each row of the subgraph matrix is a VREQsi for the specified
     subgraph Si. Each row of the VIM Candidate Matrix is VSOLci, a
@@ -802,8 +883,15 @@
     Candidate Suitability Matrix results in m valid candidates.
 </t>
 <figure title="VIM Candidate Suitability Matrix Weighting" anchor="vimweighting">
-  <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image014.png"/>
-</figure>
+<artwork><![CDATA[
+      +--         --+ +--      --+   +--      --+
+      |    VIM      | | Weight   |   | Weighted |
+      | Candidate   | | Vector   |   | Solution |
+      | Suitability | | (m x 1   | = | values   |
+      |   Matrix    | |  matrix) |   | (n x 1)  |
+      |   (n x m)   | |          |   | vector   |
+      +--         --+ +--      --+   +--      --+
+]]></artwork></figure>
 <t>
     The Orchestrator must then reconstruct candidates that create a
     proper super digraph of the VNF FG.  The union of some solutions
@@ -1021,10 +1109,11 @@
  <back>
    <references title="Normative References">
      &RFC2119;
-     &RFC7286;
+     &RFC7285;
    </references>
       <references title="Informative References">
      &IDALAGG;
+     &ALTOSSE;
    </references>
  </back>
 </rfc>
