@@ -1,0 +1,1034 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<!DOCTYPE rfc SYSTEM "rfc2629.dtd" [
+<!ENTITY RFC2119 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.2119.xml">
+<!ENTITY RFC7286 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.7286.xml">
+<!ENTITY IDALAGG SYSTEM "http://xml.resource.org/public/rfc/bibxml3/reference.I-D.bertz-alto-aggrimpl.xml">
+]>
+<?xml-stylesheet type='text/xsl' href='rfc2629.xslt' ?>
+<?rfc strict="yes" ?>
+<?rfc toc="yes"?>
+<?rfc tocdepth="4"?>
+<?rfc symrefs="yes"?>
+<?rfc sortrefs="yes" ?>
+<?rfc compact="yes" ?>
+<?rfc subcompact="no" ?>
+
+<rfc category="info" docName="draft-bertz-alto-sdnnfvalto-00" ipr="trust200902">
+ <front>
+   <title>Programmaabl NFV/SDN orchestration with ALTO</title>
+
+   <author fullname="Lyle Bertz" initials="L." surname="Bertz">
+     <organization>Sprint</organization>
+     <address>
+       <postal>
+         <street>6220 Sprint Parkway</street>
+         <city>Overland Park</city>
+         <region>KS</region>
+         <code>66251</code>
+         <country>United States</country>
+       </postal>
+       <email>lylebe551144@gmail.com</email>
+     </address>
+   </author>
+
+   <date year="2016" />
+
+   <area>Transport Area</area>
+
+   <workgroup>Application Layer Traffic Optimization</workgroup>
+
+   <keyword>SDN</keyword>
+   <keyword>ALTO</keyword>
+   <keyword>NFV</keyword>
+   <abstract>
+<t>
+     This document defines optional Diameter attributes for efficient
+     policy provisioning.
+</t>
+   </abstract>
+ </front>
+
+ <middle>
+   <section title="Introduction" anchor="intro">
+  <t>
+    This document describes a proposed framework for Orchestration
+    in a Network Function Virtualization (NFV) and Software Defined
+    Networking (SDN) environment.  Both technologies have a loose
+    coupling that enables automated deployment of Virtual Network
+    Functions (VNFs).
+  </t>
+  <section title="Reference Models" anchor="refmodels">
+  <t>
+    <xref target="etsimodel"/> shows the ETSI NFV Reference Model.
+  </t>
+<figure title="ETSI NFV Reference Model" anchor="etsimodel">
+<artwork><![CDATA[
+                  +-----------+
+                  |   E/NMS   |                +------+-----+
+                  +-----------+                |Orchestrator+-+
+                        |                      +------+-----+ |
+                        |                             |       |
+                  +-----+-----+                +------+-----+ |
+                  |    VNF    |----------------+    VNFM    | |
+                  +-----------+                |            | |
+                        |                      +------+-----+ |
+                        |                             |       |
+                  +-----+-----+                +------+-----+ |
+                  |   NFVI    |----------------|     VIM    +-+
+                  +-----------+                +------------+
+]]></artwork></figure>
+  <t>
+    The Element Manager (EM) and VNF Manager (VNFM) control the VNF.
+    The VNFM interfaces to and controls the VNF for the NFV
+    environment.  The Virtual Infrastructure Manager, e.g. OpenStack
+    or OpenVIM controllers, provides control of the underlying
+    hardware infrastructure, i.e. compute, networking, memory and
+    storage.  <xref target="etsisdnmodel"/> shows the common VIM configuration
+    where an SDN Controller is used to provide the underlying
+    networking infrastructure. Here the SDN Contoller is separated
+    from the VIM and the SDN switch is separated out from the
+    rest of the NVFI.
+  </t>
+<figure title="ETSI NFV + SDN Reference Model" anchor="etsisdnmodel">
+<artwork><![CDATA[
+                  +-----------+
+                  |   E/NMS   |   +------+-----+
+                  +-----------+   |Orchestrator+-+
+                        |         +------+-----+ |
+                        |                        |
+                  +-----+-----+   +------+-----+ |
+                  |    VNF    |---+    VNFM    | |
+                  +-----------+   |            | | +------------+
+                        |         |            |-+-|    SDN     |
+                        |         +------+-----+ | | Controller |
+                        |                |       | +-----+------+
+                  +-----+-----+   +------+-----+ |     |
+                  |   NFVI    |---|     VIM    |-+     |
+                  +-----+-----+   +------------+       |
+                        |                              |
+                  +-----+-----+                        |
+                  |    SDN    |------------------------+
+                  |   Switch  |
+                  +-----+-----+
+]]></artwork></figure>
+  <t>
+    The OSM, Open Source MANO (Management And Network Orchestration),
+    group has refined the NFV model in order to address some of the
+    scaling issues.  <xref target="osmmodel"/> shows a portion of the OSM model.
+  </t>
+<figure title="ETSI NFV + SDN Reference Model" anchor="osmmodel">
+<artwork><![CDATA[
+                              +-----------------------------+
+                              | Newtork Service Orchestrator|
+                              +-------+---------------+-----+
+                                      |               |
+                  +-----------+       |        +------+-----+
+                  |   E/NMS   |       |        |  Resource  +-+
+                  +-----------+       |        |Orchestrator| |
+                        |             |        +------+-----+ |
+                        |             |               |       |
+                        |             |        +------+-----+ |
+                  +-----+-----+       +--------+            | |
+                  |    VNF    |----------------+    VNFM    | |
+                  +-----------+                |            | |
+                        |                      +------+-----+ |
+                        |                             |       |
+                  +-----+-----+                +------+-----+ |
+                  |   NFVI    |----------------|     VIM    +-+
+                  +-----------+                +------------+
+]]></artwork></figure>
+  <t>
+    The model breaks the NFVO into a Network Service Orchestrator
+    (NSO) and Resource Orchestrator (RO).  This separation improves
+    scaling of the NFVO and allows the RO to concentrate on support
+    for multiple VNFMs and VIMs.
+  </t>
+  </section>
+  <section title="Challenges" anchor="challenges">
+  <t>
+    Open questions exist with the NFV model around data models, scale
+    and multi-domain support.   The industry often points to the
+    success of cloud services with respect to scaling and data models
+    but can't agree upon how those solutions could be standardized to
+    support NFV.  The OSM model improves scaling but does not answer
+    exactly how scalable the solution can be.
+  </t>
+  <t>
+    Both models assume that data is provided through the VIM to the
+    NFVO components and data required by new VNFs is present in the
+    system.  This implies a large amount of information flow in a
+    proactive manner from SDN Controllers through the VIM.   If data
+    is required from the Element Manager a direct interface to the
+    VNFM is required but is not specified in either model.
+ </t>
+ <t>
+   Assumed access to data through the VIM or VNFM is problematic.
+   Relevant data such as latency between sites can be measure via SDN
+   Controllers supporting Wide Area Networking (WAN).  Unfortunately
+   WAN SDN Controllers, due to factors such as separation of concerns,
+   scalability or security, are often not the same SDN Controllers a
+   VIM will communicate with.
+</t>
+ <t>
+   The number of SDN Controllers is often underestimated:
+  <list>
+   <t>
+    SDN Controllers that support low latency signaling must be located
+    close to the SDN switches they provide signaling on behalf of.
+   </t><t>
+    SDN Controllers are separated not only by function, e.g. Wide Area,
+    Application Specific or Data Center, but also by Security and
+    Organization.
+   </t><t>
+    The number of instances of VIMs and associated SDN Controllers
+    varies but in general VIM Orchestrators manage a small number of
+    racks with many VMs.  Such densities produce large information
+    that can limit the scalability of the associated SDN Controllers.
+   </t><t>
+   </t>
+  </list>
+  </t>
+  <t>
+    In practice, regional management models, multiple security zones
+    and the fact that dense computing platforms can limit a system
+    such as OpenStack to 4 to 12 racks of computing equipment per
+    instance implies the presence of several SDN Controllers in any
+    one network.
+  </t>
+  <t>
+    Regardless of a proposed framework for Orchestration, the
+    following challenges exist:
+    <list>
+    <t>
+    Access to data before a single Orchestration task occurs
+    </t><t>
+    Access to data from many SDN and VIM related sources
+    </t><t>
+    Access to new kinds of data required for Orchestration of a VNF
+    </t><t>
+    Scalability of the data access
+    </t>
+    </list>
+  </t>
+  </section>
+</section>
+     <section title="Requirements Language">
+       <t>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+       "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
+       document are to be interpreted as described in <xref
+       target="RFC2119">RFC 2119</xref>.</t>
+     </section>
+<section title="Solution Approach" anchor="approach">
+    <t>
+    A good solution that couples SDN and NFV permit Orchestration
+    with a loose coupling of both technologies.  To provide a basis
+    for the solution a method is described that approaches how
+    Orchestration may occur for an Orchestrator looking at a single
+    NFV Forwarding Graph (NFV FG) may determine if a VIM has
+    infrasctructure the meets its requirements.
+    </t>
+    <section title="Types of Information" anchor="infotypes">
+    <t>
+    Two kinds of information are required for the selection of a set
+    of suitable resources to serve the VNF FG defined for a network
+    service:
+    <list style="hanging">
+      <t hangText="Resource Constraints">
+      Specific constraints of a resource serving the VNFs of the VNF FG.
+      These constraints include minimum and maximum processing, memory,
+      storage and network requirements. They are based upon available
+      resources, i.e. inventory, available as opposed to a Performance
+      Constraint.
+      </t>
+      <t hangText="Performance Constraints">
+      Specific constraints based upon a measured / computed metric.
+      These measurements may occur over time and can exist outside of
+      any specific VNF activity, e.g. the latency between two sites.
+      </t>
+    </list>
+    </t>
+    </section>
+    <section title="Single Candidate Solution Determination Process" anchor="singlesolution">
+<t>
+    Looking at the types of Orchestration information, one can
+    evaluate a specific candidate solution for a subgraph in the VNF
+    FG as a set of matrices.
+</t><t>
+    Let VNF Requirements vector, VREQg, be the n Resource Constraints
+    (RC) and m Performance Constraints (PC) for a VNF FG subgraph g
+</t><texttable align="center" style="none">
+      <ttcol/>
+      <c>VREQg = [ RC1 RC2 ... RCn PC1 PC2 ... PCm ]</c>
+</texttable>
+<t>
+     Let VNF Solution vector, VSOLg, be the vector representing the
+     n Resources (R) and m Performance Metrics (PM) for a VIM's
+     resources supporting VNF FG subgraph g
+</t><texttable align="center" style="none">
+      <ttcol/>
+      <c>VSOLg = [ R1 R2 ... Rn PM1 PM2 ... PMm ]</c>
+</texttable><t>
+    Without loss of generality satisfaction of a specific Performance
+    Metric can be determined using subtraction, e.g. VREQg - VSOLg.
+    For example if for latency must be less than 5 then negating the
+    sign for the PM and associated RC.  If any value in the resulting
+    vector is less than 0 then, VSOLg does not satisfy VREQg.
+</t><t>
+    Multiplying the resulting matrix by a M+N x 1 matrix of weights
+    yields a value that can be determined as the fitness of the
+    solution. His can be compared with VSOLg values.
+</t>
+    <section title="Resource Values as Partitions" anchor="partitions">
+<t>
+    The representation of Resource Constraints includes the minimum/
+    maximum inventory required.  However, a VIM representing a
+    resource for a graph to a Resource Orchestrator must be careful
+    not to over-summarize the values of the resources it has.   For
+    example, let the VNF FG subgraph G be comprised of 3 VNFs:
+  <list style="symbols">
+    <t>VNF A requires 2 CPUs</t>
+    <t>VNF B requires 2 CPUs and</t>
+    <t>VNF B and VNF A have an anti-affinity, e.g. cannot be in the
+    same hardware.</t>
+  </list>
+</t>
+<t>
+    A VIM stating it has 4 CPUs of resource is insufficient to
+    determine if it can satisfy G.  Looking at the partitions (# of
+    ways to add integers to equal the value of the integer) we see
+    the partitions of 4 are:
+  <list>
+    <t>4</t>
+    <t>3+1</t>
+    <t>2+2</t>
+    <t>2+1+1</t>
+    <t>1+1+1+1</t>
+  </list>
+</t>
+<t>
+    Of the 5 partitions of 4 only one, 2+2, would satisfy G.  Thus,
+    it is important to represent the paritions and not summarize the
+    value in order to determine if a NFVI has sufficient resources
+    for satisfying the VNF FG.
+</t>
+<t>
+    For representing large numbers though this data can be compacted
+    as we propose here.  We let the notation for Resource values be
+</t><texttable align="center" style="none">
+      <ttcol/>
+      <c>Resource Vector of Type z for RZ(A) = X, [A],
+         sub-partition summary of X, [sub-partitions of X]</c>
+</texttable>
+<t>
+    where X is a non-negative integer and partition of X for the
+    entity optionally labelled "A".   The sub-partitions of X are
+    themselves partitions.  The sub-partition summary is the specific
+    sub-partition of X in comma separated values. while the options
+    sub-partition details may also be present.
+</t>
+<t>
+    If the VIM has in Chassis X 3 blades, B1 with 2 CPU, B2 with 1
+    CPU and B3 with 1 CPU we represent this as
+</t><texttable align="center" style="none">
+      <ttcol/>
+      <c>Rcpu (Chassis X) = [ 4, "Chassis X", [2,1,1],
+          [ [2, "B1", [2]], [1, "B2", [1]], [1,"B3",[1]] ] ]</c>
+</texttable>
+<t>
+    When evaluating this solution we can quickly look at the first
+    value and determine basic satisfiability.  Further inspection
+    is possible as well.
+</t><t>
+    A multi-dimensional resource representation is achieved by
+    turning individual values into arrays.  For example if we added
+    memory for all blades of 4 Gigabytes we could represent the
+    Resources as
+</t><texttable align="center" style="none">
+      <ttcol/>
+      <c>R[ cpu, memory ](Chassis X) =
+          [ [4, 6], "Chassis X", [[2,2],[2,1],[2,1]]  [[[2,2],
+            "B1",[2,2]], [[1,2],"B2", [1,2]], [[[1,2],"B3",[1,2]]]]</c>
+</texttable>
+<t>
+    Other compaction notations can be introduced as well, e.g.
+    representing B2 and B3 as {2}[2,1] in the partition description
+    and [ [1,2], ["B2","B3"], [1,2]].  However, it is proposed that
+    this is the maximum amount of information for Resource values
+    interchanged between VIMs and Orchestration functions.
+</t><t>
+    When no anti-affinities are present it may be sufficient to look
+    at the initial values of the Resource vector.  As the example
+    shows looking at specific partition information is required when
+    anti-affinities are present in the VNF FG subgraph.
+</t>
+<t>
+    NOTE that although this document proposes a representation for
+    Resource Values other representations exist that are valid, e.g.
+    a tree repsresentation, and may be more efficient.
+</t>
+    </section>
+    <section title="Performance [Metric] Constraints and Measurements" anchor="perfmetrics">
+<t>
+    Performance Constraints for VNF FG subgraph G have value and
+    optionally measurement constraints. Some measurement constraints
+    are:
+  <list style="hanging">
+    <t hangText="Staleness:">
+    Age of the measurement that is suitable for usage; otherwise new
+    measurements must be taken.
+    </t>
+    <t hangText=" Granularity:">
+    Fine or coarse grain.  Fine grained measurements require direct
+    measurements between the endpoints (resources of underlying
+    resources such as the hardware) in question.  Coarse grain
+    measurements require values produced through measurement of
+    entities in the same logical entity, e.g. site, chassis, rack,
+    etc., of the proposed solution elements.
+    </t>
+    <t hangText="Accuracy:">
+    The degree of closeness of measurements to its true value.
+    </t>
+  </list>
+</t>
+    </section>
+<section title="Data Required">
+<t>
+    <xref target="reqdata"/> shows the data required and source(s) in
+    order to determine VIM solution candidate suitability for a
+    VNF FG subgraph.
+</t>
+<texttable title="Data, Structures and Sources for VREQg and VSOLg" anchor="reqdata" style="all">
+  <ttcol>Data</ttcol>
+  <ttcol>Data Structures</ttcol>
+  <ttcol>Source Element(s)</ttcol>
+
+  <c>VNF FG Subgraph Resource Requirements</c>
+  <c>VNF Descriptors for VNFs in the sub-graph</c>
+  <c>Resource / Network Service Orchestrators</c>
+
+  <c>VNF FG Subgraph Performance Constraints</c>
+  <c>VNF Descriptors for VNFs in the sub-graph</c>
+  <c>Resource / Network Service Orchestrators</c>
+
+  <c>VIM Partitions (for candidate solutions)</c>
+  <c>VIM Resource Vectors</c>
+  <c>VIM</c>
+
+  <c>VIM Partition associated Performance Measurements</c>
+  <c>Metric Information</c>
+  <c>SDN Controllers, VIMs, VNFs, Element Managers</c>
+</texttable>
+</section>
+</section>
+<section title="Providing Performance Metrics Scalably via ALTO" anchor="altoreqs">
+<t>
+    ALTO is proposed, with some modifications, to provide the
+    Performance Measurements.  This includes:
+  <list style="hanging">
+    <t hangText="FEATURE 1">
+    Permit the Orchestrating clients (ALTO Clients) to determine if
+    the measurement constraints are satisfied by data provided.
+    </t>
+    <t hangText="FEATURE 2">
+    Provide a consistent interface from multiple data sources for
+    metrics.
+    </t>
+    <t hangText="FEATURE 3">
+    Provide mechanisms where measurements available but not
+    previously provided by the ALTO system can be supplied.
+    </t>
+    <t hangText="FEATURE 4">
+    Provide the ability to initiate measurements not currently made
+    for a metric between two entities.
+    </t>
+    <t hangText="FEATURE 5">
+    Provide mechanisms where new metrics not currently measured can
+    be provided.
+    </t>
+  </list>
+</t>
+<section title="Why ALTO?">
+<t>
+    The Application Layer Transport Optimization (ALTO) standards
+    provide network map, metric and property information for
+    Endpoints and containing logical entities known by their Provider
+    Identifiers (PIDs).  Although PIDs are most often thought of as
+    networks, network partitions or sites, they can be as granular as
+    virtual devices or a blade hosting multiple virtual machines.
+    Endpoints are contained in PIDs.  PIDs may be contained by other
+    PIDs.
+</t><t>
+    Cost Maps are based upon metrics and services provide both fine
+    (endpoint to endpoint) and coarse (pid to pid) grain
+    measurements.
+</t><t>
+    Pull (ALTO base RFC) and push (Server Side Events) mechanisms
+    exist for ALTO Clients.
+</t><t>
+    New metrics, maps and measurement data can be supported without
+    change to the Client.  However, these mechanisms need further
+    definition to allow Orchestrators, acting as ALTO Clients, to
+    manipulate the ALTO system to meet is needs.
+</t><t>
+    The biggest advantage of ALTO is its ability to serve what a
+    specific application needs for optimization while supporting
+    multiple applications simultaneously through a common, REST based
+    interface.  In general, VNFs and Services represents multiple
+    applications and the supporting Orchestrators can use ALTO as a
+    single protocol for the acquisition of performance information.
+</t>
+  </section>
+  <section title="Feature 1 Support">
+<t>
+    Given the use of an HTTP RESTful interface, the use of HTTP Date,
+    ETag, Cache-Control Expires and Last-Modified provide information
+    regarding the timing information associated with a request.  Use
+    of the Cache-Control, If-Since and If-Unmodified-Since allow
+    Client based control for Staleness.
+</t><t>
+    Given the support of Endpoint (fine grain) Cost Maps and general
+    Cost Maps (coarse) the Client can use the specific ALTO service
+    it desires for granularity.
+</t><t>
+    The accuracy of specific measurements can be provided as another
+    metric, placed as a summary value of a property in the Cost
+    Metric's associated Information Resource Directory entry or
+    provided as an Endpoint/PID property.
+</t>
+  </section>
+  <section title="Feature 2 Support">
+<t>
+    To support multiple sources and Clients (Orchestrators) the
+    following considerations are made.
+</t><t>
+    SDN Controller can provide:
+    <list>
+    <t> Network Map</t>
+    <t>Cost Map (PID to PID costs)</t>
+    <t>Endpoint Properties for those Endpoints it owns or property
+    data about an Endpoint</t>
+    <t>Endpoint Costs - For the Endpoints it owns these are Fine-grained
+      costs</t>
+    <t>PID resolution for the SDN Controller - We represent this in
+    the map by using a PID that is a 'subdomain' of the network
+    map(s) it is a part of. (This implies some extra metadata for the
+    SDN Controller in the VNF Descriptor or configuration).
+    </t>
+    <t>OPEN ISSUE: Multiple Servers providing the same JSON Path values
+    in ALTO (when Controllers are Master/Slaves or primary/backups)?</t>
+    </list>
+</t>
+<t>NFVO can provide
+   <list>
+   <t>
+     Network Map (unlikely - it should be configured to perform IRD
+     delegation which punts this function to another ALTO Server)
+   </t>
+   <t>
+    Cost Map (unlikely - it should be configured to perform IRD
+    delegation which punts this function to another ALTO Server)
+   </t>
+   <t>
+    Endpoint Properties - The data from the VNF Record for IP
+    addresses in it
+   </t>
+   <t>
+     Endpoint Costs - Yes, if present for a VNF, not already provided
+     by the SDN Controller and is fine grained only
+   </t>
+   <t>
+    OPEN ISSUE: How to detect that SDN Controller and NFVO are
+    providing same metric for same Endpoint(s), especially NOT
+    re-presenting data from SDN Controller sent via the VIM?
+   </t>
+   </list>
+</t>
+<t>
+    Although the NFVO was chosen, 4 possible routes were analyzed
+    regarding how to get VNF data to an ALTO Server using the ETSI
+    model.
+<list style="numbers">
+  <t>VNF => VNFM => NFVO</t>
+  <t>VNF => CDN Controller (NO STANDARD)</t>
+  <t>VNF => EM acting as ALTO Server</t>
+  <t>VNF is an ALTO Server</t>
+</list>
+</t>
+<t>
+    NFV Infrastructure (NFVI) data is delivered to NFVO (NFVI => VIM
+    => NFVO)
+</t><t>
+    The MOST desirable paths is #1 because the NFVO can provide VNF
+    and NFVI data.
+</t><t>
+    However, if high frequency, hysteresis, etc for the VNF is
+    desired then Option 3 (use of EM as an ALTO Server) but the
+    Client may still need access to the NFVI data from VIM or NFV
+</t>
+<t>
+    The NFVO is still the best option
+<list style="symbols">
+<t>
+    It must watch performance data of VNF and NFVI to determine if
+    new instances of the VNF should be instantiated
+</t><t>
+    Both ALTO clients and NFVO are interested in ONLY significant
+    events
+</t></list>
+</t><t>
+    To scale, some form of ALTO aggregation will be required.
+<list style="symbols">
+<t>
+    Client side integration of many ALTO Servers is complex and
+    defeats the ease of Service ALTO provides
+</t><t>
+    There will be multiple domains and with filters people are likely
+    to share data
+</t><t>
+    The number of distinct data sources is quite high - SDN
+    Controllers, VIMs, VNFs, Element Managers
+</t></list>
+</t>
+<t>
+    Aggregation of partial ALTO information is possible but not
+    standard.  <xref target="altoagg"/> shows the proposed system uses ALTO Client
+    standards and ALTO Server Side Events to maintain synchronized
+    state between ALTO Client and Server.
+</t>
+<figure title="ALTO Aggregation" anchor="altoagg">
+  <artwork>TODO</artwork>
+<!-- <artwork src="image008.png"/> -->
+</figure>
+<t>
+    <xref target="altonfvsdn"/> shows the proposed Aggregation overlay with
+    SDN and NFV.
+</t>
+<figure title="ALTO, SDN and NFV" anchor="altonfvsdn">
+    <artwork>TODO</artwork>
+<!-- <artwork src="image010.png"/> -->
+</figure>
+<t>
+    Services Group 1 ALTO Servers delegate their Map, Cost and EPCS
+    services to the ALTO aggregators.  This allows other ALTO Clients
+    to query and Element Manager or NFVO function and be directed to
+    the consolidated view provided by the ALTO Aggregator.
+</t>
+  </section>
+  <section title="Feature 3 Support">
+<t>
+    Support for Feature 3 was briefly described in <xref target="I-D.bertz-alto-aggrimpl"/> as ALTO
+    Demanded Query Recognition but is expanded upon here as On-Demand
+    measurement.  The proposed feature leverages ALTO's use of HTTP by
+    looking at query misses.  Given enough misses, e.g. a threshold,
+    the ALTO Server will take this as a hint that gathering the data
+    is important to the Client.
+</t>
+<t>
+    This opens opportunity to add filtering to the ALTO Server to
+    limit the amount of metric data or provide a generic filter for
+    initial configuration of a Server or Aggregator.  The generic
+    filter could
+<list style="symbols">
+<t>
+    Be returned during a query
+</t><t>
+    Pushed via Server Side Events (SSE)
+</t><t>
+    Allows for fast restart of a server since it is like a cache
+</t></list></t>
+<t>
+    Network Maps are NOT considered filterable at this time.
+</t>
+<t>
+    Adjustable filters, not discussed initially <xref target="I-D.bertz-alto-aggrimpl"/>, could be used in
+    the solutions to only send Cost information that Clients ask for.
+    Initial filters could be empty - only sending network topology.
+    The network image of ALTO Servers and Aggregator VNFs, i.e. ALTO
+    related configurations in a stock VM / KVM / sbare metal image,
+    can be set with a common 'blank' filter; reducing configuration
+    complexity.
+</t>
+<t>
+    High Client Query rates could further be capitalized upon by
+    the Server to
+<list style="symbols">
+<t>
+    Take more measurements from different endpoints to increase
+    samples / improve computations
+</t><t>
+    Increasing frequency of measurements
+</t></list></t>
+<t>
+    Aging of old queries could result in narrowing filters.
+</t>
+  </section>
+  <section title="Feature 4 Support">
+<t>
+    Adjustable Filters do not address how measurements could be
+    initiated between two entities to generate cost map data
+    (assumes data is already present in underlying data source.
+</t>
+<t>
+    A new ALTO feature, Measurement Initiation, is proposed.  It is
+    ability to initiate measurement process (by entities outside of
+    the ALTO Server). It solves the 'what if data is not present'
+    question but opens new questions
+<list style="symbols">
+<t>
+    How to detect Measurement Initiators?
+</t><t>
+    How to let Measurement Initiators find each other?
+</t><t>
+    Where to do work (outside of the current ALTO scope)?
+</t><t>
+    What is the protocol to initiate measurement?
+</t></list></t>
+<t>
+    The proposed feature measures data currently being asked for that
+    does not exist in the local ALTO server.  It determines who
+    should measure by relying on Endpoint and especially PID
+    properties.  A 'Measurement Initiators' property is added to
+    Endpoints or, preferably PIDs, which is a list specifying the
+    endpoints that could initiate measurements to/from a PID or
+    endpoint.  Additional discriminators such as the metrics
+    supported by specific initiators can be provided.  Ideally, the
+    endpoints for a measurement initiator can be added to the
+    Information Resource Directory (IRD) metric information.
+</t><t>
+    The process is defined as:
+<list style="numbers">
+<t>
+    Subsequent ALTO Server query misses occur even though an
+    Adjustable Filter exists.
+</t><t>
+    The ALTO Server sends request to Measurement Initiator with the
+    Endpoints / PIDs and metric(s) requested.  This instance is
+    referred to as the Initial Measurement Initiator (IMI).
+</t><t>
+    IMI then queries ALTO Endpoint Property Service to find
+    Measurement Initiators for corresponding Endpoint Property /
+    PIDs.  These are Corresponding Measurement Initiators (CMIs).
+</t><t>
+    IMI and CMIs arrange measurements and populate data into local
+    data stores accessible by their local ALTO Server(s)
+</t></list></t>
+<t>
+    An ALTO Server (MI Client) can also ask for
+<list style="symbols">
+<t>
+    Measurement Frequency increase / decrease
+</t><t>
+    Cessation of a measurement
+</t><t>
+    More sampling points an aggregate computation, e.g. PID level
+    metrics
+</t></list></t>
+<t>
+    The specific Measurement Initiation, Negotiation and subsequent
+    lifecycle management is outside of the current ALTO scope and
+    requires further work.
+</t>
+  </section>
+  <section title="Feature 5 Support">
+<t>
+    In order to support new metrics a plug-in model to ALTO servers
+    can be supported.  When a VNF Descriptor is introduced into the
+    system, ideally, plug-ins supporting metric measurement,
+    computation and the Measurement Initiation process (Feature 4)
+    will be made available.
+</t><t>
+    When the ALTO server determines that it is time to provide the
+    new metric, it can download the appropriate plug-ins, update its
+    IRD and begin processing.  There may be numerous triggers for this.
+</t>
+<t><spanx style="emph">Being Proactive</spanx></t>
+<t>
+    There are several situations where the system can be proactive.
+<list style="symbols">
+<t>
+    When a VNF Descriptor is introduced into the system an
+    Orchestrator can proactively query for measurements to 'prime'
+    the ALTO system.
+</t><t>
+    When VIMs appear to be close to exhaust the ALTO Client layer can
+    search for suitable VIMs to focus their provisioning upon and
+    begin filter adjustments and demand measurement processes.
+</t><t>
+    Upon the addition of a new VIM, SDN Controller or other ALTO
+    source the ALTO Client layer can execute priming queries to begin
+    the Measurement Initiation and On-Demand Measurement processes.
+</t></list></t>
+</section>
+<section title="Summary" anchor="featuresummary">
+<t>
+    The use of ALTO, with some modifications, allows performance
+    measurements to be dynamically added to the system for new
+    sites, endpoints or even new types of performance metrics.
+    Enhancement to ALTO are required but appear to be minor.
+</t>
+</section>
+  </section>
+</section>
+<section title="" anchor="selforganization">
+<t>
+    ALTO provides the ability for Clients to look up ALTO Servers
+    <xref target="RFC7286"/>.  This can be enhanced to support Aggregator Discovery or an
+    alternative method can be constructed. ALTO information origins,
+    which are ALTO servers, can be discovered by Aggregators acting
+    as Clients.  The mechanism by which Aggregators divide work can be
+    defined, if required.  Regardless, as new Aggregators and Servers
+    are instantiated they can be found and self-organize.
+</t>
+</section>
+<section title="Programmability Overview" anchor="programmability">
+<t>
+    Using the Single Candidate Solution Process described above
+    multiple subgraphs can be evaluation across multiple VIMs, i.e.
+    many VREQg / VSOLg pairs can be computed for different subgraphs
+    using matrix operations.  By partitioning the VNF FG into subgraphs
+    a total VNF FG can be evaluated across multiple VIMs.  <xref target="paralleleval"/>
+    shows the overall process.
+</t>
+<figure title="Parallel VNF FG subgraph and VIM candidate Evaluation" anchor="paralleleval">
+  <artwork>TODO</artwork>
+<!-- <artwork src="image012.png"/> -->
+</figure>
+<t>
+    Each row of the subgraph matrix is a VREQsi for the specified
+    subgraph Si. Each row of the VIM Candidate Matrix is VSOLci, a
+    corresponding solution subgraph in a VIM's subgraph Ci.  RC data
+    and Performance data are provided as described above.  Like the
+    single candidate solution process, any resulting row with a
+    negative value is in invalid solution.
+</t><t>
+    <xref target="vimweighting"/> shows the weighting process, assuming the VIM
+    Candidate Suitability Matrix results in m valid candidates.
+</t>
+<figure title="VIM Candidate Suitability Matrix Weighting" anchor="vimweighting">
+  <artwork>TODO</artwork>
+<!-- <artwork src="image014.png"/> -->
+</figure>
+<t>
+    The Orchestrator must then reconstruct candidates that create a
+    proper super digraph of the VNF FG.  The union of some solutions
+    *may* result in graphs equal to the VNF FG while others will be
+    super digraphs with distinct advantages.
+</t><t>
+   The overall process for the Orchestration layer is defined as:
+<list style="hanging">
+  <t hangText="STEP 1">
+    Orchestrator generates partial solutions, i.e. subgraph, of the
+    VNF FG that it believes it can be satisfied by the VIMs' resource
+    information.  These become candidate partial solutions Si for a
+    subgraph of the VNF FG.
+  </t>
+  <t hangText="STEP 2">
+    Orchestrator computes the Performance Constraints for the VNFs
+    contained in the subgraph as well as those introduced by the
+    partitioning of the VNF FG into the specified subgraph Si.
+  </t>
+  <t>
+    The union of data in Step 1 and 2 completes the initial
+    Subgraph Matrix.
+  </t>
+  <t hangText="STEP 3">
+    Orchestrator determines the possible VIM Candidate Solutions Ci
+    for a specific Si.  Note that here multiple VIMs or solution
+    within a VIM may be evaluated for a specific Si.  In this case
+    the Subgraph Matrix is expanded accordingly and results in
+    multiple copies of Si appearing in the matrix.  How or even if
+    this is done is specific to the Orchestrator.  The Resource
+    Partition(s) are then placed into each row.
+  </t>
+  <t hangText="STEP 4">
+    Orchestrator queries ALTO aggregators for Performance
+    Measurements associated with the VIM Candidate Solution in each
+    row.
+  </t>
+  <t>
+    The addition of rows, as required, in the Subgraph Matrix in Step
+    3 completes its construction.
+  </t>
+  <t>
+    The union of data in Step 3 and 4 completes the VIM Candidate
+    Matrix.
+  </t>
+  <t hangText="STEP 5">
+    The VIM Candidate Matrix is subtracted from the Subgraph Matrix
+    creating the VIM Candidate Suitability Matrix.
+  </t>
+  <t hangText="STEP 6">
+    Any row with a negative value is removed from the VIM Candidate
+    Suitability Matrix.
+  </t>
+  <t hangText="STEP 7 (Optional)">
+    A weight vector is multiplied to the VIM Candidate Suitability
+    Matrix resulting in an objective function evaluation of each VIM
+    Candidate.
+  </t>
+  <t hangText="STEP 8">
+    The results of Step 7 (or Step 6 if no weighting was applied) is
+    then recombined with various subgraphs that could provide a super
+    digraph of the VNF FG.  This value is then evaluated and a final
+    set of VIM candidates is made.
+  </t>
+  <t hangText="STEP 9">
+    All VIMs (or their Resource Orchestrators) are sent requests for
+    fulfillment of the VNF FG.
+  </t>
+</list>
+</t>
+</section>
+<section title="Data Provided in Orchestration Requests" anchor="dataprovided">
+<t>
+    In order to provide more programmability the following data is
+    sent from the requestor:
+<list style="hanging">
+<t hangText="Request Row">
+    VNF FG Subgraph's Requirements.
+</t>
+<t hangText="VIM Data Row">
+    It shows the ALTO (performance) + Resource Information that was
+    used to determine the selection.
+</t>
+<t hangText="Upper Bounds Row">
+    Upper Bounds that the VIM may auto-scale the VNFs in the VNF FG
+    subgraph to w/o querying the VIM.
+</t>
+<t hangText="Lower Bounds Row">
+    Lower Bounds where if they are maintained for a pre-defined
+    period will require the VIM to notify the Orchestrator.
+</t>
+</list>
+</t>
+<t>
+    The VIM data row gives the request receiver insight into the
+    accuracy/staleness of Resource Information and/or Performance
+    Measurements.  If these values are considered too old it is up to
+    the receiver of the request to increase the update frequency.  If
+    information is consistently wrong over multiple requests it may
+    also be a bad actor in the system (defective or a security issue)
+    that should be raised by the request receiver.
+</t>
+<t>
+    The upper and lower bounds provide thresholds for meaningful
+    events to the requestor.  If the receiver does not monitor all of
+    the performance metrics in a bound row it may reconfigure itself
+    to do so or merely concern itself with what is monitors.
+    Negotiation of what it will monito is outside of the scope of
+    this document.
+</t>
+</section>
+<section title="Proposed System and Benefits" anchor="proposalbenefits">
+<t>
+  The system is comprised of the following elements:
+<list style="symbols"><t>
+    ALTO Server integrated SDN Controller
+</t><t>
+    ALTO aggregators
+</t><t>
+    Measurement Initiators (may be part of Controllers)
+</t><t>
+    ALTO integrated NFVO
+</t><t>
+    ALTO integrated VNF EM (optional)
+</t><t>
+    ALTO Client based Orchestrator
+</t></list></t>
+<t>
+    The system contains the following features:
+<list style="symbols"><t>
+    ALTO aggregation for Scaling over multiple SDN Controllers / NFVI
+    domains
+</t><t>
+    On Demand Measurements / Measurement Initiation to adapt to
+    different Orchestrator information needs
+</t><t>
+    Minimal interchange between VIM and Orchestrator
+</t><t>
+    Orchestrator can get data from ANY ALTO source
+</t><t>
+    System can
+<list style="symbols"><t>
+      Adapt to new metrics from VNFs
+</t><t>
+      Send only data that is required
+</t><t>
+      Auto discovery of VIMs, Aggregators and Orchestrators via ALTO
+      self organization
+</t></list></t>
+<t>
+    Detection of stale or incorrect information
+</t></list></t>
+<t>
+    Multiple VIMs, Orchestrators and VNFs can be dynamically
+    supported.
+<list style="symbols">
+<t>
+    Orchestrators can cut the VNF FG over multiple VIMs, create VIM
+    candidate solutions and computations w/o issue
+  <list style="symbols"><t>
+      How the VNF FG is cut is Orchestrator specific
+</t><t>
+      How candidates are computed given VIM data is Orchestrator specific
+</t><t>
+      Orchestrators can meaningfully differentiate
+</t></list></t>
+<t>
+     VIMs can serve multiple Orchestrators consistently
+</t><t>
+     VNFs that introduce new performance metrics can be accommodated
+<list style="symbols"><t>
+       Use On Demand Measurements for specifying metric information
+       w/o system overload
+</t><t>
+       Use Measurement Initiation to provide metric information that
+       was not currently being captured
+</t><t>
+       Provide some 'plug-in' framework in popular SDN Controllers to
+       dynamically load / compute metrics, e.g. javascript scripts with
+       Controller API access
+</t><t>
+       When an Orchestrator gets a metric is has not seen before it
+       could proactively initiate the On Demand Measurement /
+       Measurement Initiation functions to ensure system can make an
+       informed decision the first time a VNF instantiation request
+       is made
+</t></list></t>
+  </list></t>
+  </section>
+<section title="Summary" anchor="summary">
+<t>
+    A proposed framework for Performance Measurement and Resource
+    information exchange amongst various data sources can be used for
+    determination of VNF FG instantiation.  This framework can adapt
+    to new measurements between entities and even the introduction of
+    new metrics that must be measured.  Self-organization and the
+    ability to expand / contract the information interchanged make
+    the solutions data minimal and relevant.  Innovation in
+    orchestration is still possible but the high level types of
+    information, what is interchanged and how that is exchanged are
+    standardized.
+</t>
+</section>
+   <section anchor="IANA" title="IANA Considerations">
+     <t>This memo includes no request to IANA.</t>
+   </section>
+   <section anchor="Security" title="Security Considerations">
+     <t>
+     This informational document relies upon security mechanisms, if
+     any, that would recommended by ALTO specifications.
+     </t>
+   </section>
+ </middle>
+
+ <back>
+   <references title="Normative References">
+     &RFC2119;
+     &RFC7286;
+   </references>
+      <references title="Informative References">
+     &IDALAGG;
+   </references>
+ </back>
+</rfc>
