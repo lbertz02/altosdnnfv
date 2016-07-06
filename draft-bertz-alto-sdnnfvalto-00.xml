@@ -603,7 +603,7 @@
     SDN and NFV.
 </t>
 <figure title="ALTO, SDN and NFV" anchor="altonfvsdn">
-    <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image010.png"/>
+    <artwork src="https://raw.githubusercontent.com/lbertz02/altosdnnfv/master/image012.png"/>
 </figure>
 <t>
     Services Group 1 ALTO Servers delegate their Map, Cost and EPCS
